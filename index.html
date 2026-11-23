@@ -145,6 +145,19 @@ header{background:var(--glass);backdrop-filter:blur(14px);border-bottom:1px soli
  .dashboard.peek{flex:0 0 150px!important}.dashboard.peek .dash-body>.section:not(:nth-child(2)){display:none}.dashboard.peek details{display:none}
 }
 
+/* ===== Mobile scroll fix ===== */
+.dash-body{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding-bottom:calc(28px + env(safe-area-inset-bottom,0px))}
+@media(max-width:760px){
+ .workspace{display:flex;flex-direction:column;height:100%}
+ .map-panel{flex:1 1 0;min-height:120px}
+ .dashboard{display:flex;flex-direction:column;flex:0 0 46%;min-height:0;overflow:hidden;margin-top:-14px;position:relative;z-index:600;transition:flex-basis .2s}
+ .dashboard[data-s=peek]{flex:0 0 132px!important}
+ .dashboard[data-s=full]{flex:0 0 82%!important}
+ .dash-head{flex-shrink:0}
+ .dash-body{flex:1 1 0;min-height:0}
+ .sheet-handle{width:56px;height:6px}
+}
+
 </style>
 </head>
 <body>
@@ -215,13 +228,6 @@ header{background:var(--glass);backdrop-filter:blur(14px);border-bottom:1px soli
     <div class="unit"><small>Perimeter (metres)</small><strong id="perimM">0 m</strong></div>
    </div>
   </section>
-  <section class="section"><div class="heading"><b>LAND VALUE ESTIMATE</b><span style="font-size:9px;color:#8a96a9">Optional</span></div>
-   <div class="row2">
-    <div><label class="field-label" for="ratePerAcre">RATE PER ACRE (₹)</label><input class="tool-input" id="ratePerAcre" type="number" min="0" inputmode="decimal" placeholder="e.g. 1500000"></div>
-    <div><label class="field-label" for="ratePerGuntha">RATE PER GUNTHA (₹)</label><input class="tool-input" id="ratePerGuntha" type="number" min="0" inputmode="decimal" placeholder="e.g. 40000"></div>
-   </div>
-   <div class="value-box" id="valueBox">Enter a rate to see estimated value.</div>
-  </section>
   <section class="section"><div class="heading"><b>SAVED PLOTS</b><button class="btn soft" id="saveLib" type="button">＋ Save current</button></div><div id="libList"><div class="empty">No saved plots yet.</div></div></section>
   <section class="section"><div class="heading"><b>FIND A PLACE</b></div>
    <div class="row-search"><input class="tool-input" id="placeInput" type="search" placeholder="Village, town or address…" autocomplete="off"><button class="btn primary" id="placeButton" type="button">Search</button></div>
@@ -257,13 +263,10 @@ header{background:var(--glass);backdrop-filter:blur(14px);border-bottom:1px soli
   </div>
   <div class="amount-wrap"><span>₹</span><input id="donateAmount" type="number" min="1" max="100000" inputmode="numeric" placeholder="Enter any amount" value="101"></div>
   <button class="gpay-btn" id="gpayPay" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3" stroke="#fff" stroke-width="2"/><path d="M2 10h20" stroke="#fff" stroke-width="2"/></svg><span id="gpayLabel">Pay with Google Pay</span></button>
-  <div class="upi-box"><span>UPI ID: <b id="upiIdText">prasadshete112-1@okicici</b></span><button id="copyUpi" type="button">Copy</button></div>
-  <div class="qr-wrap" id="qrWrap" hidden><div id="donateQR"></div><small>On a computer? Scan this QR with Google Pay / any UPI app.</small></div>
-  <p class="modal-note">Payment opens in your Google Pay app. If it does not open, copy the UPI ID above and pay manually from any UPI app.</p>
+  <p class="modal-note">Payment opens in your Google Pay app. Please open this page on your phone to donate.</p>
  </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 "use strict";
 const STORAGE_KEY="farmmeasure_pro_compact_v3",SQM_PER_ACRE=4046.8564224,SQM_PER_GUNTHA=101.17141056,M_TO_FT=3.280839895;
@@ -731,23 +734,16 @@ const inr=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 function plotName(){return(extras.name||"").trim()||"My land measurement"}
 
 function extraUpdate(){
+ if(!gpsBusy){const n=points.length;$("headerStatus").textContent=finished?"Completed":n?n+(n===1?" point":" points"):(mode==="gps"?"GPS mode":"Manual mode")}
  const sqm=areaSqm();
  $("areaHa").textContent=(sqm/10000).toFixed(4);
  $("areaSqft").textContent=Math.round(sqm*SQFT_PER_SQM).toLocaleString("en-IN");
  $("areaSqyd").textContent=Math.round(sqm*SQYD_PER_SQM).toLocaleString("en-IN");
  const per=perimeter();
  $("perimM").textContent=per.toLocaleString("en-IN",{maximumFractionDigits:1})+" m";
- const ra=parseFloat(extras.ratePerAcre),rg=parseFloat(extras.ratePerGuntha);
- let v="";
- if(sqm>0&&ra>0)v+="By acre rate: "+inr(sqm/SQM_PER_ACRE*ra);
- if(sqm>0&&rg>0)v+=(v?"\n":"")+"By guntha rate: "+inr(sqm/SQM_PER_GUNTHA*rg);
- $("valueBox").style.whiteSpace="pre-line";
- $("valueBox").textContent=v||(ra>0||rg>0?"Complete a boundary (3+ points) to see value.":"Enter a rate to see estimated value.");
 }
-$("plotName").value=extras.name||"";$("ratePerAcre").value=extras.ratePerAcre||"";$("ratePerGuntha").value=extras.ratePerGuntha||"";
+$("plotName").value=extras.name||"";
 $("plotName").addEventListener("input",e=>{extras.name=e.target.value;saveExtras()});
-$("ratePerAcre").addEventListener("input",e=>{extras.ratePerAcre=e.target.value;if(e.target.value){extras.ratePerGuntha="";$("ratePerGuntha").value=""}saveExtras();extraUpdate()});
-$("ratePerGuntha").addEventListener("input",e=>{extras.ratePerGuntha=e.target.value;if(e.target.value){extras.ratePerAcre="";$("ratePerAcre").value=""}saveExtras();extraUpdate()});
 extraUpdate();
 
 /* ---- Place search (OpenStreetMap Nominatim) ---- */
@@ -778,9 +774,6 @@ function summaryText(){
   "Perimeter: "+fmt(perimeter())+" ("+perimeter().toFixed(1)+" m)",
   "Boundary points: "+points.length
  ];
- const ra=parseFloat(extras.ratePerAcre),rg=parseFloat(extras.ratePerGuntha);
- if(sqm>0&&ra>0)lines.push("Estimated value: "+inr(sqm/SQM_PER_ACRE*ra));
- else if(sqm>0&&rg>0)lines.push("Estimated value: "+inr(sqm/SQM_PER_GUNTHA*rg));
  if(points.length){const c=centroid();lines.push("Location: https://www.google.com/maps?q="+c.lat.toFixed(6)+","+c.lng.toFixed(6))}
  lines.push("(Measurements are estimates)");
  return lines.join("\n");
@@ -849,13 +842,7 @@ function gpayLink(amount){
  if(isIOS)return"gpay://upi/pay?"+q;
  return"upi://pay?"+q;
 }
-function renderQR(){
- if(isMobile){$("qrWrap").hidden=true;return}
- $("qrWrap").hidden=false;
- const box=$("donateQR");box.innerHTML="";
- if(typeof QRCode==="undefined"){box.textContent="QR unavailable offline.";return}
- try{qrObj=new QRCode(box,{text:upiLink(donateAmount()),width:160,height:160,correctLevel:QRCode.CorrectLevel.M})}catch(e){box.textContent="QR unavailable."}
-}
+function renderQR(){}
 function openDonate(e){if(e)e.preventDefault();$("donateModal").hidden=false;renderQR()}
 function closeDonate(){$("donateModal").hidden=true}
 $("donateOpen").onclick=openDonate;$("donateFoot").onclick=openDonate;$("donateClose").onclick=closeDonate;
@@ -875,11 +862,10 @@ $("donateAmount").addEventListener("input",()=>{
 $("gpayPay").onclick=()=>{
  const amt=donateAmount();
  if(!amt){toast("Enter an amount of ₹1 or more.");return}
- if(!isMobile){toast("Scan the QR with your phone, or open this page on your phone.");return}
+ if(!isMobile){toast("Please open this page on your phone to donate with Google Pay.");return}
  toast("Opening Google Pay…");
  window.location.href=gpayLink(amt);
 };
-$("copyUpi").onclick=async()=>toast(await copyText(UPI_ID)?"UPI ID copied":"Could not copy");
 
 
 /* ===== Modern UI, accuracy & library layer ===== */
@@ -914,8 +900,10 @@ syncUnit();
 $("unitButton").onclick=()=>{distUnit=distUnit==="ft"?"m":"ft";try{localStorage.setItem("fm_unit",distUnit)}catch(e){}syncUnit();redraw()};
 
 /* mobile bottom sheet */
-$("sheetHandle").onclick=()=>{$("dashboard").classList.toggle("peek");setTimeout(()=>map.invalidateSize({pan:false}),60)};
-if(matchMedia("(max-width:760px)").matches)$("dashboard").classList.add("peek");
+const sheetStates=["half","full","peek"];
+$("dashboard").dataset.s="half";
+$("sheetHandle").onclick=()=>{const d=$("dashboard"),i=sheetStates.indexOf(d.dataset.s);d.dataset.s=sheetStates[(i+1)%3];setTimeout(()=>map.invalidateSize({pan:false}),80)};
+
 
 /* shortcuts + tile errors */
 document.addEventListener("keydown",e=>{
